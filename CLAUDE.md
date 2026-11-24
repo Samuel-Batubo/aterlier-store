@@ -10,9 +10,22 @@ Early stage: Next.js 16 (App Router, `src/` dir, Turbopack) + TypeScript + Tailw
 
 ## Environment
 
-Copy `.env.example` to `.env.local`. Required: `DATABASE_URL` (Neon pooled connection string), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`; `NEXT_PUBLIC_APP_URL` for the browser auth client. `.gitignore` ignores `.env*` except `.env.example`.
+There is no committed env template. Create `.env.local` with:
 
-`src/db/index.ts` throws at import time if `DATABASE_URL` is unset, so `next build` and any request touching `/api/auth/*` fail without it. `next build` also needs a **migrated and seeded** database, because product pages query it in `generateStaticParams`, which must return at least one slug under Cache Components. `drizzle.config.ts` loads `.env.local` then `.env` via dotenv (drizzle-kit does not read Next's env files on its own).
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` | Neon **pooled** connection string; the host looks like `ep-…-pooler.<region>.aws.neon.tech` |
+| `BETTER_AUTH_SECRET` | Random secret (`npx @better-auth/cli secret`). Without it, `next build` logs a "default secret" `BetterAuthError` (non-fatal) |
+| `BETTER_AUTH_URL` | App origin, e.g. `http://localhost:3000` |
+| `NEXT_PUBLIC_APP_URL` | Same origin, for the browser auth client |
+
+`.gitignore` ignores every `.env*` file (`!.env.example` would re-include a template if one is added). Never commit real values.
+
+Load order: Next, `drizzle.config.ts` and `src/db/seed.ts` all read `.env.local` before `.env`, so `.env.local` wins. A variable already set in the OS or shell environment beats both files, because dotenv doesn't override existing variables. A leftover placeholder URL in `.env.local` (or a stale Windows env var) therefore silently shadows a real one in `.env`.
+
+`src/db/index.ts` throws at import time if `DATABASE_URL` is unset, so `next build` and any request touching `/api/auth/*` fail without it. `next build` also needs a **migrated and seeded** database, because product pages query it in `generateStaticParams`, which must return at least one slug under Cache Components.
+
+`drizzle-kit migrate` exits 1 **without printing the cause** when it can't reach the database (bad host, DNS, wrong URL). To see the real error, run the migration through `drizzle-orm/neon-http/migrator` from a small Node script, or `fetch` the host directly. A new Neon endpoint can also fail DNS (`ENOTFOUND`) briefly right after creation; retry before assuming the URL is wrong.
 
 ## Architecture
 
@@ -34,6 +47,10 @@ Copy `.env.example` to `.env.local`. Required: `DATABASE_URL` (Neon pooled conne
 ## Windows/OneDrive gotcha
 
 The repo lives in a OneDrive folder. OneDrive can turn `.next/` entries into cloud placeholders, which makes `next build` fail with `EPERM ... unlink`. Delete `.next` and rebuild. After deleting it, run `next build` before `tsc --noEmit`, because the global `LayoutProps`/`PageProps` types are generated into `.next/types`.
+
+## Repository
+
+The remote is `origin` → `https://github.com/Samuel-Batubo/aterlier-store.git`. The GitHub repo name is spelled `aterlier-store`, unlike the project name. That's the URL the owner gave, so don't "fix" it without asking. The default branch is `main`, and commits use the GitHub noreply address set in the repo-local git config. Pushing over HTTPS needs an interactive GitHub sign-in the first time, which a non-interactive shell can't show, so the first push has to come from a regular terminal.
 
 ## Design system
 
